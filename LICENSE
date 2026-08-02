@@ -1,0 +1,43 @@
+Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+
+Copyright (c) 2026 Yen-Jung Chiu
+
+This work — the code, configuration and documentation in this repository — is
+licensed under the Creative Commons Attribution-NonCommercial 4.0
+International License.
+
+You are free to:
+
+  Share  — copy and redistribute the material in any medium or format
+  Adapt  — remix, transform, and build upon the material
+
+Under the following terms:
+
+  Attribution   — You must give appropriate credit, provide a link to the
+                  license, and indicate if changes were made. You may do so in
+                  any reasonable manner, but not in any way that suggests the
+                  licensor endorses you or your use.
+
+  NonCommercial — You may not use the material for commercial purposes.
+
+  No additional restrictions — You may not apply legal terms or technological
+                  measures that legally restrict others from doing anything the
+                  license permits.
+
+The full legal code is available at:
+
+  https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+A human-readable summary is at:
+
+  https://creativecommons.org/licenses/by-nc/4.0/
+
+---
+
+Third-party components
+
+This repository does not redistribute any pretrained model weights. Teacher
+foundation models are fetched from their original distribution channels and
+remain subject to their own licences, several of which are more restrictive
+than this one and require separate access approval. Datasets referenced in
+README.md are likewise governed by the terms of their original custodians.

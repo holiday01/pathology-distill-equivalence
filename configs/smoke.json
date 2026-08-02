@@ -1,0 +1,7 @@
+{
+  "sources": [
+    {"type": "hdf5", "tag": "c16", "path": "/path/to/wsi_hl/data/patches_camelyon16_full.h5", "max_samples": 2000},
+    {"type": "folder", "tag": "nct_crc", "root": "/path/to/wsi_hl/data/external/nct_crc/NCT-CRC-HE-100K_unz/NCT-CRC-HE-100K", "patterns": ["*.tif"], "max_samples": 2000, "group_strategy": "bucket:20"},
+    {"type": "numpy", "tag": "pannuke", "paths": ["/path/to/wsi_hl/data/external/pannuke/fold_1_unz/Fold 1/images/fold1/images.npy"], "max_samples": 1000, "group_strategy": "bucket:20"}
+  ]
+}
