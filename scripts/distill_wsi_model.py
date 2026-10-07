@@ -360,7 +360,7 @@ _IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 # Feeding ImageNet-normalised tiles to hibou degraded its features and held the
 # distilled students near zero (best_val ~0.02 vs ~0.3 for other teachers).
 # TeacherModel.forward converts ImageNet-normalised input to these stats for
-# hibou teachers only; all other teachers are untouched.
+# hibou teachers only; all other teachers are untouched. See research/hibou_fix.md.
 _HIBOU_MEAN = torch.tensor([0.7068, 0.5755, 0.7220]).view(3, 1, 1)
 _HIBOU_STD = torch.tensor([0.1950, 0.2316, 0.1816]).view(3, 1, 1)
 

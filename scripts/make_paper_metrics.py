@@ -242,7 +242,9 @@ def main():
                 pass
         # FLOPs
         f_t = flops_data.get(r["fm"])
-        f_s = flops_data.get("student_vit_small")
+        # Student FLOPs are looked up per architecture, from the same counter
+        # as the teachers (compute_fm_flops_consistent.py).
+        f_s = flops_data.get(f"student_{r['student'].split('_')[0]}")
         if f_t and "gflops" in f_t:
             r["teacher_gflops"] = f_t["gflops"]
         if f_s and "gflops" in f_s:

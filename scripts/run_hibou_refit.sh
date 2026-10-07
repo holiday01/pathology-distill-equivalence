@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hibou re-fit with the per-teacher normalisation fix.
+# Hibou re-fit with the per-teacher normalisation fix (research/hibou_fix.md).
 #
 # The seed=42 atlas trained hibou-B/L under ImageNet normalisation, which is
 # wrong for hibou and held the students near zero (best_val ~0.02). The fix in

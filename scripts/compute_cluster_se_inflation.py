@@ -15,7 +15,7 @@ Inflation factor = se_cluster / se_naive  (>=1 means naive understates SE).
 
 Headline per-pair value = the student C16-linear probe (the deployed model).
 Output: outputs/v4_full/cluster_vs_naive_se.csv (one row per pair) and a
-markdown summary with the median + IQR across pairs.
+markdown summary with median + IQR for the five \PEND× paper sites.
 
 NOTE on power: the atlas C16 test split currently has n_slides=2, so each
 per-pair ratio is low-power; the *median across pairs* is the reported

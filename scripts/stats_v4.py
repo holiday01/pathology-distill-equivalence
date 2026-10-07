@@ -1,6 +1,6 @@
 """Statistical utilities for v4 equivalence testing.
 
-Slide-cluster bootstrap + TOST.
+Slide-cluster bootstrap + TOST as specified in reviews/proposal_v4.md.
 Rationale: patches from the same WSI are not independent, so naive
 patch-level resampling under-estimates variance. Cluster by slide
 (group id), resample slides with replacement, and take each slide's
@@ -9,7 +9,9 @@ patches whole.
 Public API:
     slide_cluster_bootstrap(values, groups, stat_fn, n_boot, seed)
     tost_equivalence(t_correct, s_correct, groups, margin, n_boot, seed)
-    hierarchical_bh(per_teacher_pvals, alpha)
+    hierarchical_bh(per_teacher_pvals, alpha)      (within-family BH only)
+    benjamini_bogomolov(family_pvals, q)            (selective two-level FDR)
+    benjamini_yekutieli(pvals, q)                   (BH under arbitrary dependence)
 """
 from __future__ import annotations
 
@@ -164,6 +166,64 @@ def hierarchical_bh(
         rejected[teacher] = bh(arr, alpha).tolist()
         min_p[teacher] = float(arr.min()) if len(arr) else 1.0
     return {"rejected": rejected, "teacher_min_p": min_p}
+
+
+def _bh_reject(pvals: np.ndarray, level: float) -> np.ndarray:
+    """Benjamini-Hochberg step-up at `level`; returns a boolean mask."""
+    p = np.asarray(pvals, dtype=float)
+    n = len(p)
+    if n == 0:
+        return np.zeros(0, dtype=bool)
+    order = np.argsort(p)
+    below = p[order] <= level * np.arange(1, n + 1) / n
+    out = np.zeros(n, dtype=bool)
+    if below.any():
+        out[order[: np.max(np.where(below)[0]) + 1]] = True
+    return out
+
+
+def simes(pvals: Sequence[float]) -> float:
+    """Simes combination p-value of a family: min_j m p_(j) / j."""
+    p = np.sort(np.asarray(pvals, dtype=float))
+    m = len(p)
+    return float(np.min(m * p / np.arange(1, m + 1)))
+
+
+def benjamini_bogomolov(
+    family_pvals: Dict[str, Sequence[float]],
+    q: float = 0.05,
+) -> Dict[str, object]:
+    """Selective inference on multiple families (Benjamini & Bogomolov 2014).
+
+    1. Each family is summarised by its Simes p-value.
+    2. Families are selected by BH at level q over the m family p-values;
+       R families are selected.
+    3. Within each selected family, BH is applied at level R*q/m.
+    Unselected families have no rejections. This controls the expected
+    average FDR over the selected families at q (for independent or
+    PRDS families); it does not control the FDR pooled over all
+    hypotheses.
+    """
+    names = list(family_pvals)
+    m = len(names)
+    fam_p = np.array([simes(family_pvals[k]) for k in names])
+    sel = _bh_reject(fam_p, q)
+    R = int(sel.sum())
+    level = R * q / m if m else 0.0
+    rejected = {}
+    for k, s in zip(names, sel):
+        p = np.asarray(family_pvals[k], dtype=float)
+        rejected[k] = (_bh_reject(p, level) if s else np.zeros(len(p), bool)).tolist()
+    return {"family_simes_p": dict(zip(names, fam_p.tolist())),
+            "selected": dict(zip(names, sel.tolist())),
+            "n_selected": R, "within_level": level, "rejected": rejected}
+
+
+def benjamini_yekutieli(pvals: Sequence[float], q: float = 0.05) -> np.ndarray:
+    """BH at level q / sum_{i<=n} 1/i: FDR control under arbitrary dependence."""
+    p = np.asarray(pvals, dtype=float)
+    c = np.sum(1.0 / np.arange(1, len(p) + 1)) if len(p) else 1.0
+    return _bh_reject(p, q / c)
 
 
 if __name__ == "__main__":

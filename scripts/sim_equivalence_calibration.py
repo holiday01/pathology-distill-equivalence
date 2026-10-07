@@ -15,14 +15,28 @@ iff d + z_alpha * se < delta, i.e. with prob alpha when se is correct. If se
 is understated by a factor f (= cluster_se / naive_se), the effective z is
 inflated and the false-equivalence probability rises well above alpha.
 """
+import json
+import statistics as st
+import sys
+from pathlib import Path
+
 import numpy as np
 from scipy import stats
 
+sys.path.insert(0, str(Path(__file__).parent))
+from paper_cohort import filter_rows
+
+RES = Path("outputs/v4_full/c16_270")
+
 DELTA = 0.05
-SE_CLUSTER = 0.025          # correct slide-cluster SE
-INFLATION = 6.8            # empirical median cluster/naive inflation
-TAU = 0.03                 # teacher-shared dependence sd (per-comparison should be invariant)
-N_TEACH, N_STU = 12, 3
+_PANEL = filter_rows(json.load(open(RES / "c16_equiv_annotated.json"))["rows"])
+# correct slide-cluster SE: median over the panel, from the 90% percentile CI
+SE_CLUSTER = st.median((r["linear_auc_ci"][1] - r["linear_auc_ci"][0]) / (2 * 1.6448536)
+                       for r in _PANEL)
+# empirical median cluster/naive inflation on the reported panel (135 slides)
+INFLATION = st.median(r["linear_auc_inflation"] for r in _PANEL)
+TAU = 1.2 * SE_CLUSTER     # teacher-shared effect sd, NOT included in the SE
+N_TEACH, N_STU = 10, 3
 N_REP = 200000
 Z90 = stats.norm.ppf(0.95)  # one-sided alpha=0.05 -> 90% CI
 
@@ -48,15 +62,17 @@ def main():
     naive_se = SE_CLUSTER / INFLATION
     print(f"delta={DELTA}, cluster_se={SE_CLUSTER}, inflation={INFLATION} -> naive_se={naive_se:.5f}\n")
     print("false-equivalence rate at the margin boundary (nominal alpha=0.05):")
+    out = {"inflation": INFLATION, "n_teachers": N_TEACH, "tau_over_se": TAU / SE_CLUSTER}
     for dep in (False, True):
         r_cluster = false_equiv_rate(SE_CLUSTER, dep)
         r_naive = false_equiv_rate(naive_se, dep)
         tag = "with teacher dependence" if dep else "independent"
         print(f"  [{tag:24s}] cluster-SE TOST: {r_cluster:.3f}   naive-SE TOST: {r_naive:.3f}")
-    print(f"\n=> cluster-SE TOST is calibrated at alpha (~0.05) and invariant to dependence;")
-    print(f"   naive-SE TOST is anti-conservative (false-equivalence >> alpha),")
-    print(f"   exactly the regime in which the literature's 'no-significant-difference'")
-    print(f"   equivalence claims have been made.")
+        key = "dep" if dep else "indep"
+        out[f"cluster_{key}"] = float(r_cluster)
+        out[f"naive_{key}"] = float(r_naive)
+    (RES / "sim_equivalence_calibration.json").write_text(json.dumps(out, indent=1))
+    print(f"[wrote] {RES / 'sim_equivalence_calibration.json'}")
 
 
 if __name__ == "__main__":

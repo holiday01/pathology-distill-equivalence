@@ -251,3 +251,58 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def test_simes_single_and_uniform():
+    from stats_v4 import simes
+    assert simes([0.03]) == 0.03
+    assert abs(simes([0.01, 0.02, 0.03]) - 0.03) < 1e-12
+
+
+def test_bb_selects_only_families_with_signal():
+    from stats_v4 import benjamini_bogomolov
+    fams = {"sig": [1e-4, 2e-4, 0.3], "null": [0.4, 0.6, 0.9]}
+    r = benjamini_bogomolov(fams, q=0.05)
+    assert r["selected"] == {"sig": True, "null": False}
+    assert r["n_selected"] == 1 and abs(r["within_level"] - 0.025) < 1e-12
+    assert r["rejected"]["sig"] == [True, True, False]
+    assert r["rejected"]["null"] == [False, False, False]
+
+
+def test_bb_within_level_is_stricter_than_q():
+    # a p-value that BH at q would reject but BH at Rq/m does not
+    from stats_v4 import benjamini_bogomolov
+    fams = {"a": [0.001, 0.04], "b": [0.5, 0.9]}
+    r = benjamini_bogomolov(fams, q=0.05)
+    assert r["rejected"]["a"] == [True, False]
+
+
+def test_bb_fdr_under_null_mixture():
+    """Average FDR over selected families stays near or below q."""
+    from stats_v4 import benjamini_bogomolov
+    rng = np.random.default_rng(1)
+    q, fdps = 0.05, []
+    for _ in range(2000):
+        fams, truth = {}, {}
+        for f in range(6):
+            n_alt = 3 if f < 2 else 0
+            z = np.r_[rng.normal(3.5, 1, n_alt), rng.normal(0, 1, 10 - n_alt)]
+            from math import erf, sqrt
+            p = np.array([0.5 * (1 - erf(v / sqrt(2))) for v in z])
+            fams[f] = p; truth[f] = np.r_[np.ones(n_alt, bool), np.zeros(10 - n_alt, bool)]
+        r = benjamini_bogomolov(fams, q)
+        sel = [f for f in fams if r["selected"][f]]
+        if not sel:
+            fdps.append(0.0); continue
+        per = []
+        for f in sel:
+            rej = np.array(r["rejected"][f]); v = (rej & ~truth[f]).sum()
+            per.append(v / max(rej.sum(), 1))
+        fdps.append(np.mean(per))
+    assert np.mean(fdps) <= q + 0.01
+
+
+def test_by_is_more_conservative_than_bh():
+    from stats_v4 import benjamini_yekutieli, _bh_reject
+    p = np.array([0.001, 0.008, 0.02, 0.03, 0.2])
+    assert benjamini_yekutieli(p).sum() <= _bh_reject(p, 0.05).sum()

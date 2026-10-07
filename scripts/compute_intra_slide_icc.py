@@ -11,17 +11,40 @@ Output: outputs/v4_full/intra_slide_icc.json
 """
 import sys, json, statistics as st
 from pathlib import Path
-import numpy as np, torch, h5py
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent))
-from eval_c16_equivalence import load_c16, stratified_slide_split, extract
-from distill_wsi_model import TeacherModel
-from evaluate_distillation import linear_probe
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# The ICC pass needs torch, h5py and the four teacher encoders; --refresh-observed
+# needs none of them and must stay runnable without a GPU or the project modules
+# on the path, so those imports are deferred to the functions that use them.
 TEACHERS = ["uni2-h", "h-optimus-0", "virchow2", "uni"]
 C16 = "/path/to/cache/patches/patches_c16_annotated.h5"
 KAT = "/path/to/cache/patches/patches_kather_msi.h5"
+C16_EQUIV = "outputs/v4_full/c16_equiv_annotated.json"
+KAT_EQUIV = "outputs/v4_full/kather_msi_equiv.json"
+
+
+def _gpu_env():
+    """Import the GPU/data stack and return what the ICC pass needs."""
+    global torch, h5py, TeacherModel, linear_probe
+    global load_c16, stratified_slide_split, extract
+    import torch, h5py
+    sys.path.insert(0, str(Path(__file__).parent))
+    from eval_c16_equivalence import load_c16, stratified_slide_split, extract
+    from distill_wsi_model import TeacherModel
+    from evaluate_distillation import linear_probe
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def observed_inflation(path, field):
+    """Median cluster/naive SE ratio over the pairs in an equivalence run.
+
+    Read from the equivalence results so that this file and the manuscript
+    cannot report different inflations for the same runs.
+    """
+    from paper_cohort import filter_rows
+    rows = filter_rows(json.load(open(path))["rows"])
+    v = [r[field] for r in rows if r.get(field) is not None]
+    return round(st.median(v), 2)
 
 
 def icc_oneway(x, groups):
@@ -79,9 +102,32 @@ def measure(h5, tr_idx, te_idx, y_tr, y_te, grp_te, tag):
             "m": round(m, 1), "n_clusters": int(n_cl), "predicted_de_inflation": round(de, 2)}
 
 
+def refresh_observed(json_path, c16_equiv, kat_equiv):
+    """Recompute only the observed-inflation field of an existing result file.
+
+    The ICC measurement needs four teacher encoders over the full patch set;
+    the observed inflation needs neither. Correcting a stale literal should not
+    require the GPU pass, and should not be done by editing the JSON by hand.
+    """
+    out = json.load(open(json_path))
+    was = out.get("observed_auc_inflation")
+    out["observed_auc_inflation"] = {
+        "c16": observed_inflation(c16_equiv, "linear_auc_inflation"),
+        "kather": observed_inflation(kat_equiv, "linear_inflation"),
+    }
+    json.dump(out, open(json_path, "w"), indent=2)
+    print(f"[refresh] {json_path}\n  was {was}\n  now {out['observed_auc_inflation']}")
+
+
 def main():
+    if "--refresh-observed" in sys.argv:
+        refresh_observed("outputs/v4_full/intra_slide_icc.json",
+                         C16_EQUIV, KAT_EQUIV)
+        return
+    global device
+    device = _gpu_env()
     out = {}
-    # CAMELYON16 (41 test slides, deterministic split seed=42)
+    # CAMELYON16 (deterministic slide-level split, seed=42)
     idx, labels, sid = load_c16(C16, None)
     tr, te, nts, ntot = stratified_slide_split(sid, labels, idx, 0.5)
     print(f"C16: {nts} test slides, {len(te)} test tiles")
@@ -93,7 +139,13 @@ def main():
     ktr = np.where(~kte)[0]; ktei = np.where(kte)[0]
     print(f"Kather: {len(np.unique(kpid[ktei]))} test patients, {len(ktei)} test tiles")
     out["kather"] = measure(KAT, ktr, ktei, kl[ktr], kl[ktei], kpid[ktei], "Kather")
-    out["observed_auc_inflation"] = {"c16": 6.83, "kather": 4.32}
+    # Derived, not typed. These were hard-coded literals carried over from an
+    # earlier cohort, which then disagreed with the inflation the manuscript
+    # reported from the same runs.
+    out["observed_auc_inflation"] = {
+        "c16": observed_inflation(C16_EQUIV, "linear_auc_inflation"),
+        "kather": observed_inflation(KAT_EQUIV, "linear_inflation"),
+    }
     json.dump(out, open("outputs/v4_full/intra_slide_icc.json", "w"), indent=2)
     print("\n=== SUMMARY (measured rho vs observed AUROC inflation) ===")
     for c in ("c16", "kather"):

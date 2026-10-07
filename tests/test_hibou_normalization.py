@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit test for the per-teacher hibou normalisation fix.
+"""Unit test for the hibou normalisation fix (research/hibou_fix.md).
 
 Root cause: the distillation pipeline feeds ImageNet-normalised tiles to every
 teacher, but hibou requires its own mean/std. TeacherModel.forward now converts

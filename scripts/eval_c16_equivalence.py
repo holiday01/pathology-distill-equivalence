@@ -155,6 +155,13 @@ def auc_cluster_tost(y, t_score, s_score, groups, margin=0.05, n_boot=1000, seed
     lo, hi = float(np.quantile(dc, 0.05)), float(np.quantile(dc, 0.95))
     se_c = float(dc.std(ddof=1))
     se_n = float(np.std(dn, ddof=1)) if len(dn) >= 20 else float("nan")
+    # Bootstrap TOST p-values, one per one-sided null, with the +1
+    # correction so a p-value is never exactly zero. The pair-level
+    # equivalence p-value is max(p_lower, p_upper) (intersection-union);
+    # these feed the Benjamini-Bogomolov multiplicity step in stats_v4.
+    p_lower = float((np.sum(dc <= -margin) + 1) / (len(dc) + 1))
+    p_upper = float((np.sum(dc >= margin) + 1) / (len(dc) + 1))
+    out.update(p_lower=p_lower, p_upper=p_upper, p_tost=max(p_lower, p_upper))
     out.update(lo=lo, hi=hi, equiv=bool(lo > -margin and hi < margin),
                se_cluster=se_c, se_naive=se_n,
                inflation=(se_c / se_n if se_n and se_n > 0 else float("nan")))
@@ -172,6 +179,8 @@ def main():
                     help="equivalence margin on the AUC difference (headline metric)")
     ap.add_argument("--bs", type=int, default=256)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--save_scores", action="store_true",
+                    help="write per-pair test-tile probe scores to <out dir>/scores/")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -256,6 +265,13 @@ def main():
                 rec[f"{kind}_auc_ci"] = [round(au["lo"], 4), round(au["hi"], 4)]
                 rec[f"{kind}_equiv"] = au["equiv"]          # headline equivalence
                 rec[f"{kind}_auc_inflation"] = round(au["inflation"], 3)
+                rec[f"{kind}_auc_p_tost"] = au.get("p_tost")
+                if args.save_scores:
+                    sdir = Path(args.out).parent / "scores"
+                    sdir.mkdir(parents=True, exist_ok=True)
+                    np.savez_compressed(sdir / f"{fm}__{stu_short}__{kind}.npz",
+                                        y=y_te_np, t=prob1(tr_r), s=prob1(sr),
+                                        groups=grp_te.astype(str))
                 rec[f"{kind}_t_bacc"] = round(float(balanced_accuracy_score(y_te_np, tp)), 4)
                 rec[f"{kind}_s_bacc"] = round(float(balanced_accuracy_score(y_te_np, sp)), 4)
             rows.append(rec)

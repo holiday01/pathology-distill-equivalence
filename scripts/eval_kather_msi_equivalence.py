@@ -82,6 +82,7 @@ def main():
                 rec[f"{kind}_auc_d"] = round(au["d"], 4)
                 rec[f"{kind}_state"] = st
                 rec[f"{kind}_inflation"] = round(au["inflation"], 3)
+                rec[f"{kind}_auc_p_tost"] = au.get("p_tost")
             rows.append(rec)
             print(f"  {fm:14s} {stu:10s} lin T={rec['linear_t_auc']:.3f} "
                   f"S={rec['linear_s_auc']:.3f} {rec['linear_state']:12s} "

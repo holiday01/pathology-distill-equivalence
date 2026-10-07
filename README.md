@@ -1,10 +1,10 @@
 # Slide-cluster-robust equivalence testing for distilled pathology foundation models
 
 Code release: the distillation, evaluation and statistics pipeline behind a
-controlled 36-run teacher/student atlas (12 public pathology foundation models
+controlled 30-run teacher/student atlas (10 public pathology foundation models
 × 3 ViT student sizes), together with a reusable implementation of
 slide-cluster-robust equivalence testing (TOST + slide-cluster bootstrap +
-hierarchical FDR).
+selective FDR control across families).
 
 This repository contains **code and operating instructions only**. No
 manuscript text, figures or results are included here. Trained checkpoints,
@@ -17,7 +17,7 @@ patch bundles and result JSONs are distributed separately (see
 
 | Path | Contents |
 |---|---|
-| `scripts/stats_v4.py` | **Self-contained statistics module.** Slide-cluster bootstrap, TOST equivalence, hierarchical Benjamini–Hochberg. Reusable on any benchmark with a patch→slide mapping. |
+| `scripts/stats_v4.py` | **Self-contained statistics module.** Slide-cluster bootstrap, TOST equivalence, Benjamini–Bogomolov selective FDR (Simes family p-values) and Benjamini–Yekutieli. Reusable on any benchmark with a patch→slide mapping. |
 | `scripts/distill_*.py` | Distillation training (teacher zoo loading, student models, cosine CLS + patch-token loss). |
 | `scripts/eval_*.py` | Equivalence evaluations (CAMELYON16, Kather-MSI, full variance stack, external-model audit). |
 | `scripts/extract_*.py`, `scripts/build_*.py` | Patch extraction and HDF5 bundle construction. |
@@ -137,7 +137,10 @@ python3 scripts/build_kather_msi_h5.py --help      # second cohort
 
 ### 2. Distil the atlas
 
-12 teachers × 3 student sizes = 36 runs, shared recipe, single seed:
+12 teachers × 3 student sizes = 36 runs, shared recipe, single seed. The
+six Hibou-B/Hibou-L runs were fed ImageNet channel statistics the Hibou
+encoders do not use and are excluded from every analysis
+(`scripts/paper_cohort.py`), leaving 10 teachers × 3 = 30 runs:
 
 ```bash
 bash scripts/run_v4_full.sh
